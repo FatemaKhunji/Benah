@@ -60,3 +60,15 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# ---- Benah ----
+# Firebase settings file: each developer downloads their own from the Firebase console.
+GoogleService-Info.plist
+# macOS / Xcode noise
+.DS_Store
+DerivedData/
+*.xcuserstate
+# Firebase CLI
+.firebase/
+firebase-debug.log
+firestore-debug.log

@@ -20,10 +20,12 @@ struct BenahApp: App {
 
     var body: some Scene {
         WindowGroup {
+            // Order matters: `.toastHost()` must come BEFORE `.environment(toasts)`.
+            // An environment value only reaches modifiers written above it (inside it).
             RootView()
+                .toastHost()
                 .environment(session)
                 .environment(toasts)
-                .toastHost()
                 .task { await session.restore() }
         }
     }

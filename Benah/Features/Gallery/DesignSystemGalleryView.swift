@@ -220,6 +220,6 @@ struct FlowRow: Layout {
 
 #Preview {
     NavigationStack { DesignSystemGalleryView() }
-        .environment(ToastCenter())
         .toastHost()
+        .environment(ToastCenter())
 }

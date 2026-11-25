@@ -22,9 +22,9 @@ struct BenahTextField: View {
     var placeholder: String = ""
     var prefix: String? = nil
     var helper: String? = nil
+    var isRequired: Bool = false
     /// When not nil, the field shows the error state with this message.
     var error: String? = nil
-    var isRequired: Bool = false
     var keyboard: UIKeyboardType = .default
     var textContentType: UITextContentType? = nil
 

@@ -1,0 +1,115 @@
+// firestore.rules
+// Security rules for Cloud Firestore: the server checks these on EVERY read/write.
+//
+// 📘 Learning note
+// The app code can be changed by anyone who copies it, so the real protection is
+// here, on Google's servers. Each `match` is a path; each `allow` says who may
+// read / create / update / delete there. `request.auth.uid` is the signed-in user.
+// `resource.data` = the document as it is now; `request.resource.data` = as it would be after the write.
+//
+// How to publish: Firebase console → Firestore Database → Rules → paste this file → Publish.
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+    function signedIn() { return request.auth != null; }
+    function isMe(uid) { return signedIn() && request.auth.uid == uid; }
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+    function myProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    // Restricted accounts (the Khalid flow) cannot create new groups.
+    function notLimited() { return myProfile().get('status', 'active') != 'limited'; }
+
+    // ---------- users ----------
+    match /users/{uid} {
+      // Members see each other's names in groups.
+      allow read: if signedIn();
+      // You create your own profile, as an ordinary active member.
+      allow create: if isMe(uid)
+        && request.resource.data.role == 'member'
+        && request.resource.data.status == 'active';
+      // You may edit your profile but not promote or un-restrict yourself. Admins may change status.
+      allow update: if (isMe(uid)
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.status == resource.data.status)
+        || isAdmin();
+      allow delete: if false;
+
+      match /people/{personId} { allow read, write: if isMe(uid); }
+      match /savedGroups/{groupId} { allow read, write: if isMe(uid); }
+      match /notifications/{notificationId} {
+        allow read, update, delete: if isMe(uid);
+        // Other members create notifications for you (e.g. "Yousif wants to join").
+        allow create: if signedIn();
+      }
+    }
+
+    // ---------- Jam'iya ----------
+    match /jamiyas/{jamiyaId} {
+      // Any signed-in user can read, so "join with code" can show a preview.
+      allow read: if signedIn();
+      allow create: if signedIn() && notLimited()
+        && request.resource.data.hostId == request.auth.uid
+        && request.auth.uid in request.resource.data.memberIds;
+      allow update: if signedIn() && (request.auth.uid in resource.data.memberIds || isAdmin());
+      allow delete: if signedIn() && resource.data.hostId == request.auth.uid;
+
+      match /swapRequests/{requestId} {
+        allow read, write: if signedIn()
+          && request.auth.uid in get(/databases/$(database)/documents/jamiyas/$(jamiyaId)).data.memberIds;
+      }
+    }
+
+    // ---------- Lammah ----------
+    match /lammahs/{lammahId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && notLimited() && request.resource.data.hostId == request.auth.uid;
+      allow update: if signedIn() && (request.auth.uid in resource.data.participantIds || isAdmin());
+      allow delete: if signedIn() && resource.data.hostId == request.auth.uid;
+    }
+
+    // ---------- Qattah ----------
+    match /qattahs/{qattahId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && notLimited() && request.resource.data.hostId == request.auth.uid;
+      allow update: if signedIn() && (request.auth.uid in resource.data.participantIds || isAdmin());
+      allow delete: if signedIn() && resource.data.hostId == request.auth.uid;
+    }
+
+    // ---------- Join requests ----------
+    match /joinRequests/{requestId} {
+      allow create: if signedIn() && request.resource.data.requesterId == request.auth.uid;
+      allow read, update: if signedIn()
+        && (resource.data.requesterId == request.auth.uid || resource.data.hostId == request.auth.uid);
+    }
+
+    // ---------- Payments (simulated: no real money) ----------
+    match /payments/{paymentId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.payerId == request.auth.uid;
+      allow update: if signedIn() && resource.data.payerId == request.auth.uid;
+      allow delete: if false;
+    }
+
+    // ---------- Reports ----------
+    match /reports/{reportId} {
+      allow create: if signedIn() && request.resource.data.reporterId == request.auth.uid;
+      allow read: if signedIn() && (resource.data.reporterId == request.auth.uid || isAdmin());
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // ---------- Admins ----------
+    // Staff accounts are added by hand in the Firebase console (a document admins/{uid}).
+    match /admins/{adminId} {
+      allow read: if isMe(adminId);
+      allow write: if false;
+    }
+  }
+}
